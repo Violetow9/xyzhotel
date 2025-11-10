@@ -3,16 +3,15 @@ package application
 import (
 	"context"
 	"errors"
-
-	"xyzhotel/domain/customer"
+	customer2 "xyzhotel/internal/domain/customer"
 
 	"github.com/google/uuid"
 )
 
 type CreateCustomerCmd struct {
 	FullName string
-	Email    customer.Email
-	Phone    customer.Email
+	Email    customer2.Email
+	Phone    customer2.Email
 }
 
 func (cc *CreateCustomerCmd) IsEmpty() bool {
@@ -25,10 +24,10 @@ var (
 )
 
 type CreateCustomerHandler struct {
-	CustomerRepository customer.Repository
+	CustomerRepository customer2.Repository
 }
 
-func (h CreateCustomerHandler) Handle(ctx context.Context, cmd *CreateCustomerCmd) (*customer.Customer, error) {
+func (h CreateCustomerHandler) Handle(ctx context.Context, cmd *CreateCustomerCmd) (*customer2.Customer, error) {
 	if cmd.IsEmpty() {
 		return nil, ErrCustomerFieldEmpty
 	}
@@ -43,12 +42,12 @@ func (h CreateCustomerHandler) Handle(ctx context.Context, cmd *CreateCustomerCm
 		return nil, err
 	}
 
-	cust = &customer.Customer{
+	cust = &customer2.Customer{
 		ID:       id,
 		FullName: cmd.FullName,
 		Email:    cmd.Email,
 		Phone:    cmd.Phone,
-		Wallet:   customer.ZeroWallet(),
+		Wallet:   customer2.ZeroWallet(),
 	}
 	err = h.CustomerRepository.CreateCustomer(ctx, cust)
 	if err != nil {

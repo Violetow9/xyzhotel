@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"xyzhotel/domain/customer"
+	customer2 "xyzhotel/internal/domain/customer"
 
 	"github.com/google/uuid"
 )
@@ -14,12 +14,12 @@ func TestCreateCustomerHandler_EmailAlreadyExists(t *testing.T) {
 	// And an email that already exists in the Repository
 	ctx := context.Background()
 	email := "existingemail@gmail.com"
-	repository := customer.NewFakeRepositoryWithCustomers(&customer.Customer{
+	repository := customer2.NewFakeRepositoryWithCustomers(&customer2.Customer{
 		ID:       uuid.New(),
 		FullName: "ExistingUser",
 		Email:    email,
 		Phone:    "1234567890",
-		Wallet:   customer.ZeroWallet(),
+		Wallet:   customer2.ZeroWallet(),
 	})
 	createCustomerHandler := &CreateCustomerHandler{
 		CustomerRepository: repository,
@@ -48,7 +48,7 @@ func TestCreateCustomerHandler_FieldEmpty(t *testing.T) {
 	// Given a create customer handler
 	// And a customer with an empty full name
 	ctx := context.Background()
-	repository := customer.NewFakeRepository()
+	repository := customer2.NewFakeRepository()
 	createCustomerHandler := &CreateCustomerHandler{
 		CustomerRepository: repository,
 	}
@@ -76,7 +76,7 @@ func TestCreateCustomerHandler_NonExistingAccount(t *testing.T) {
 	// Given a customer service
 	// And an email that does not exist in the Repository
 	ctx := context.Background()
-	repository := customer.NewFakeRepository()
+	repository := customer2.NewFakeRepository()
 	createCustomerHandler := &CreateCustomerHandler{
 		CustomerRepository: repository,
 	}

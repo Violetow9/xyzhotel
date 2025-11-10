@@ -4,28 +4,28 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"xyzhotel/domain/customer"
-	"xyzhotel/domain/money"
+	customer2 "xyzhotel/internal/domain/customer"
+	money2 "xyzhotel/internal/domain/money"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
-func createDebitWallet(initialMoney float64, moneyToDebit float64, currencyTarget money.Currency) (*customer.Customer, *DebitWalletCmd, *DebitWallerHandler) {
-	cust := customer.NewCustomer(
+func createDebitWallet(initialMoney float64, moneyToDebit float64, currencyTarget money2.Currency) (*customer2.Customer, *DebitWalletCmd, *DebitWallerHandler) {
+	cust := customer2.NewCustomer(
 		uuid.New(),
 		"John",
 		"john@gmail.com",
 		"0987654321",
-		customer.NewWallet(decimal.NewFromFloat(initialMoney)),
+		customer2.NewWallet(decimal.NewFromFloat(initialMoney)),
 	)
-	customerRepository := customer.NewFakeRepositoryWithCustomers(cust)
-	customerService := &customer.Service{
+	customerRepository := customer2.NewFakeRepositoryWithCustomers(cust)
+	customerService := &customer2.Service{
 		Repository: customerRepository,
 	}
 	cmd := &DebitWalletCmd{
 		CustomerID: cust.ID,
-		Money: money.Money{
+		Money: money2.Money{
 			Amount:   decimal.NewFromFloat(moneyToDebit),
 			Currency: currencyTarget,
 		},
@@ -40,7 +40,7 @@ func TestDebitWalletHandler_InSameCurrency(t *testing.T) {
 	// Given a debit wallet handler
 	// And a customer with a wallet
 	// And an amount to be debited in the same currency as the wallet
-	cust, cmd, handler := createDebitWallet(100, 10, money.EUR)
+	cust, cmd, handler := createDebitWallet(100, 10, money2.EUR)
 
 	// When processing the credit
 	err := handler.Handle(context.Background(), cmd)
@@ -61,7 +61,7 @@ func TestDebitWalletHandler_InOtherCurrency(t *testing.T) {
 	// And an amount to be debited in a different currency than the wallet
 	initialMoney := 100.0
 	amountToDebit := 50.0
-	cust, cmd, handler := createDebitWallet(initialMoney, amountToDebit, money.USD)
+	cust, cmd, handler := createDebitWallet(initialMoney, amountToDebit, money2.USD)
 
 	// When processing the debit
 	err := handler.Handle(context.Background(), cmd)
@@ -70,7 +70,7 @@ func TestDebitWalletHandler_InOtherCurrency(t *testing.T) {
 	}
 
 	// Then verify the wallet balance is updated correctly
-	expectedBalance := decimal.NewFromFloat(initialMoney - (amountToDebit * money.USDToEURRate.InexactFloat64()))
+	expectedBalance := decimal.NewFromFloat(initialMoney - (amountToDebit * money2.USDToEURRate.InexactFloat64()))
 	if !cust.Wallet.Balance().Equal(expectedBalance) {
 		t.Errorf("expected wallet balance to be %s, got %s", expectedBalance, cust.Wallet.Balance().String())
 	}
@@ -83,7 +83,7 @@ func TestDebitWalletHandler_InsufficientFunds(t *testing.T) {
 	// But the wallet has insufficient funds
 	initialMoney := 10.0
 	moneyToDebit := 50.0
-	cust, cmd, handler := createDebitWallet(initialMoney, moneyToDebit, money.EUR)
+	cust, cmd, handler := createDebitWallet(initialMoney, moneyToDebit, money2.EUR)
 
 	// When processing the debit
 	err := handler.Handle(context.Background(), cmd)

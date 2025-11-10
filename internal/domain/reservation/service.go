@@ -3,15 +3,15 @@ package reservation
 import (
 	"context"
 	"time"
-	"xyzhotel/domain/room"
+	room2 "xyzhotel/internal/domain/room"
 )
 
 type Service struct {
 	ReservationRepository Repository
-	RoomRepository        room.Repository
+	RoomRepository        room2.Repository
 }
 
-func (rs *Service) ShowReservationHistory(ctx context.Context, roomId room.ID) []Reservation {
+func (rs *Service) ShowReservationHistory(ctx context.Context, roomId room2.ID) []Reservation {
 	reservations := rs.ReservationRepository.ListAll(ctx)
 	var history []Reservation
 	for _, reservation := range reservations {
@@ -29,7 +29,7 @@ func (rs *Service) CreateReservation(ctx context.Context, reservation *Reservati
 	return rs.ReservationRepository.Save(ctx, reservation)
 }
 
-func (rs *Service) IsRoomAvailable(ctx context.Context, roomID room.ID, startDate time.Time, amountOfNights uint8) (bool, error) {
+func (rs *Service) IsRoomAvailable(ctx context.Context, roomID room2.ID, startDate time.Time, amountOfNights uint8) (bool, error) {
 	reservations := rs.ReservationRepository.ListAll(ctx)
 	endDate := startDate.AddDate(0, 0, int(amountOfNights))
 	for _, reservation := range reservations {
@@ -46,9 +46,9 @@ func (rs *Service) IsRoomAvailable(ctx context.Context, roomID room.ID, startDat
 	return true, nil
 }
 
-func (rs *Service) ListAvailableRooms(ctx context.Context) []*room.Room {
+func (rs *Service) ListAvailableRooms(ctx context.Context) []*room2.Room {
 	rooms := rs.RoomRepository.ListAll(ctx)
-	var availableRooms []*room.Room
+	var availableRooms []*room2.Room
 	for _, r := range rooms {
 		isAvailable, _ := rs.IsRoomAvailable(ctx, r.ID, time.Now(), 1)
 		if isAvailable {
@@ -58,9 +58,9 @@ func (rs *Service) ListAvailableRooms(ctx context.Context) []*room.Room {
 	return availableRooms
 }
 
-func (rs *Service) ListOccupiedRooms(ctx context.Context) []*room.Room {
+func (rs *Service) ListOccupiedRooms(ctx context.Context) []*room2.Room {
 	rooms := rs.RoomRepository.ListAll(ctx)
-	var occupiedRooms []*room.Room
+	var occupiedRooms []*room2.Room
 	for _, r := range rooms {
 		isAvailable, _ := rs.IsRoomAvailable(ctx, r.ID, time.Now(), 1)
 		if !isAvailable {

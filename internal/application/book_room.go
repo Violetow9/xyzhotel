@@ -4,18 +4,18 @@ import (
 	"context"
 	"errors"
 	"time"
-	"xyzhotel/domain/customer"
-	"xyzhotel/domain/reservation"
-	"xyzhotel/domain/room"
+	customer2 "xyzhotel/internal/domain/customer"
+	reservation2 "xyzhotel/internal/domain/reservation"
+	room2 "xyzhotel/internal/domain/room"
 
 	"github.com/google/uuid"
 )
 
 type BookRoomCmd struct {
-	CustomerID     customer.ID
+	CustomerID     customer2.ID
 	CheckInDate    time.Time
 	AmountOfNights uint8
-	Rooms          []room.ID
+	Rooms          []room2.ID
 }
 
 var (
@@ -26,12 +26,12 @@ var (
 )
 
 type BookRoomHandler struct {
-	CustomerRepository customer.Repository
-	ReservationService *reservation.Service
-	RoomRepository     room.Repository
+	CustomerRepository customer2.Repository
+	ReservationService *reservation2.Service
+	RoomRepository     room2.Repository
 }
 
-func (h BookRoomHandler) Handle(ctx context.Context, cmd *BookRoomCmd) (*reservation.Reservation, error) {
+func (h BookRoomHandler) Handle(ctx context.Context, cmd *BookRoomCmd) (*reservation2.Reservation, error) {
 	if cmd.CheckInDate.Before(time.Now()) {
 		return nil, ErrCheckInDateInPast
 	}
@@ -49,7 +49,7 @@ func (h BookRoomHandler) Handle(ctx context.Context, cmd *BookRoomCmd) (*reserva
 		return nil, err
 	}
 
-	rooms := make([]*room.Room, 0, len(cmd.Rooms))
+	rooms := make([]*room2.Room, 0, len(cmd.Rooms))
 	for _, roomID := range cmd.Rooms {
 		r, err := h.RoomRepository.FindByID(ctx, roomID)
 		if err != nil {
@@ -73,7 +73,7 @@ func (h BookRoomHandler) Handle(ctx context.Context, cmd *BookRoomCmd) (*reserva
 		return nil, err
 	}
 
-	res := &reservation.Reservation{
+	res := &reservation2.Reservation{
 		ID:             id,
 		Customer:       cust,
 		CheckInDate:    cmd.CheckInDate,

@@ -2,18 +2,17 @@ package application
 
 import (
 	"context"
-
-	"xyzhotel/domain/customer"
-	"xyzhotel/domain/money"
+	customer2 "xyzhotel/internal/domain/customer"
+	money2 "xyzhotel/internal/domain/money"
 )
 
 type CreditWalletCmd struct {
-	CustomerID customer.ID
-	Money      money.Money
+	CustomerID customer2.ID
+	Money      money2.Money
 }
 
 type CreditWalletHandler struct {
-	CustomerService *customer.Service
+	CustomerService *customer2.Service
 }
 
 func (h CreditWalletHandler) Handle(ctx context.Context, cmd *CreditWalletCmd) error {
@@ -22,7 +21,7 @@ func (h CreditWalletHandler) Handle(ctx context.Context, cmd *CreditWalletCmd) e
 		return err
 	}
 
-	converter, err := money.CurrencyToConverter(cmd.Money.Currency)
+	converter, err := money2.CurrencyToConverter(cmd.Money.Currency)
 	if err != nil {
 		return err
 	}

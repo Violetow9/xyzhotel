@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 	"time"
-	"xyzhotel/domain/customer"
-	"xyzhotel/domain/reservation"
-	"xyzhotel/domain/room"
+	customer2 "xyzhotel/internal/domain/customer"
+	reservation2 "xyzhotel/internal/domain/reservation"
+	room2 "xyzhotel/internal/domain/room"
 
 	"github.com/google/uuid"
 )
@@ -16,7 +16,7 @@ func TestBookRoomHandler_CheckInDateInPast(t *testing.T) {
 	// Given a book room handler
 	// And a check-in date in the past
 	ctx := context.Background()
-	repository := customer.NewFakeRepository()
+	repository := customer2.NewFakeRepository()
 	bookRoomHandler := &BookRoomHandler{
 		CustomerRepository: repository,
 		ReservationService: nil,
@@ -25,10 +25,10 @@ func TestBookRoomHandler_CheckInDateInPast(t *testing.T) {
 
 	// When booking a room
 	_, err := bookRoomHandler.Handle(ctx, &BookRoomCmd{
-		CustomerID:     customer.ID{},
+		CustomerID:     customer2.ID{},
 		CheckInDate:    time.Now().AddDate(0, 0, -1), // Yesterday
 		AmountOfNights: 2,
-		Rooms:          []room.ID{},
+		Rooms:          []room2.ID{},
 	})
 
 	// Then expect an ErrCheckInDateInPast error
@@ -41,7 +41,7 @@ func TestBookRoomHandler_NoRoomsSelected(t *testing.T) {
 	// Given a book room handler
 	// And no rooms selected
 	ctx := context.Background()
-	repository := customer.NewFakeRepository()
+	repository := customer2.NewFakeRepository()
 	bookRoomHandler := &BookRoomHandler{
 		CustomerRepository: repository,
 		ReservationService: nil,
@@ -50,10 +50,10 @@ func TestBookRoomHandler_NoRoomsSelected(t *testing.T) {
 
 	// When booking a room
 	_, err := bookRoomHandler.Handle(ctx, &BookRoomCmd{
-		CustomerID:     customer.ID{},
+		CustomerID:     customer2.ID{},
 		CheckInDate:    time.Now().AddDate(0, 0, 1),
 		AmountOfNights: 2,
-		Rooms:          []room.ID{},
+		Rooms:          []room2.ID{},
 	})
 
 	// Then expect an ErrNoRoomsSelected error
@@ -66,7 +66,7 @@ func TestBookRoomHandler_AmountOfNightsZero(t *testing.T) {
 	// Given a book room handler
 	// And an amount of nights equal to zero
 	ctx := context.Background()
-	repository := customer.NewFakeRepository()
+	repository := customer2.NewFakeRepository()
 	bookRoomHandler := &BookRoomHandler{
 		CustomerRepository: repository,
 		ReservationService: nil,
@@ -75,10 +75,10 @@ func TestBookRoomHandler_AmountOfNightsZero(t *testing.T) {
 
 	// When booking a room
 	_, err := bookRoomHandler.Handle(ctx, &BookRoomCmd{
-		CustomerID:     customer.ID{},
+		CustomerID:     customer2.ID{},
 		CheckInDate:    time.Now().AddDate(0, 0, 1),
 		AmountOfNights: 0,
-		Rooms:          []room.ID{uuid.New()},
+		Rooms:          []room2.ID{uuid.New()},
 	})
 
 	// Then expect an ErrAmountOfNightsZero error
@@ -91,7 +91,7 @@ func TestBookRoomHandler_NonExistingCustomer(t *testing.T) {
 	// Given a book room handler
 	// And a customer ID that does not exist
 	ctx := context.Background()
-	repository := customer.NewFakeRepository()
+	repository := customer2.NewFakeRepository()
 	bookRoomHandler := &BookRoomHandler{
 		CustomerRepository: repository,
 		ReservationService: nil,
@@ -103,11 +103,11 @@ func TestBookRoomHandler_NonExistingCustomer(t *testing.T) {
 		CustomerID:     uuid.New(),
 		CheckInDate:    time.Now().AddDate(0, 0, 1),
 		AmountOfNights: 2,
-		Rooms:          []room.ID{uuid.New()},
+		Rooms:          []room2.ID{uuid.New()},
 	})
 
 	// Then expect an ErrCustomerNotFound error
-	if !errors.Is(err, customer.ErrCustomerNotFound) {
+	if !errors.Is(err, customer2.ErrCustomerNotFound) {
 		t.Errorf("expected ErrCustomerNotFound, but got: %v", err)
 	}
 }
@@ -116,11 +116,11 @@ func TestBookRoomHandler_OccupiedRooms(t *testing.T) {
 	// Given a book room handler
 	// And rooms that are already booked
 	ctx := context.Background()
-	customerRepository := customer.NewFakeRepository()
-	customerA := &customer.Customer{
+	customerRepository := customer2.NewFakeRepository()
+	customerA := &customer2.Customer{
 		ID: uuid.New(),
 	}
-	customerB := &customer.Customer{
+	customerB := &customer2.Customer{
 		ID: uuid.New(),
 	}
 	err := customerRepository.CreateCustomer(ctx, customerA)
@@ -132,20 +132,20 @@ func TestBookRoomHandler_OccupiedRooms(t *testing.T) {
 		t.Fatalf("failed to set up customer B: %v", err)
 	}
 
-	roomRepository := room.NewFakeRepository()
-	reservationRepository := reservation.NewFakeRepository()
-	reservationService := &reservation.Service{
+	roomRepository := room2.NewFakeRepository()
+	reservationRepository := reservation2.NewFakeRepository()
+	reservationService := &reservation2.Service{
 		ReservationRepository: reservationRepository,
 		RoomRepository:        roomRepository,
 	}
 	CheckInDate := time.Now().AddDate(0, 0, 1)
 	roomID := uuid.New()
-	err = reservationService.CreateReservation(ctx, &reservation.Reservation{
+	err = reservationService.CreateReservation(ctx, &reservation2.Reservation{
 		ID:             uuid.New(),
 		Customer:       customerA,
 		CheckInDate:    CheckInDate,
 		AmountOfNights: 2,
-		Rooms: []*room.Room{
+		Rooms: []*room2.Room{
 			{ID: roomID},
 		},
 	})
@@ -160,12 +160,12 @@ func TestBookRoomHandler_OccupiedRooms(t *testing.T) {
 	}
 
 	// When booking a room
-	var res *reservation.Reservation
+	var res *reservation2.Reservation
 	res, err = bookRoomHandler.Handle(ctx, &BookRoomCmd{
 		CustomerID:     customerB.ID,
 		CheckInDate:    CheckInDate,
 		AmountOfNights: 2,
-		Rooms:          []room.ID{roomID},
+		Rooms:          []room2.ID{roomID},
 	})
 
 	// Then expect an ErrRoomAlreadyBooked error

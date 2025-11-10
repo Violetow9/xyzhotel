@@ -2,8 +2,8 @@ package customer
 
 import (
 	"net/http"
-	"xyzhotel/application"
-	"xyzhotel/domain/money"
+	application2 "xyzhotel/internal/application"
+	money2 "xyzhotel/internal/domain/money"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,9 +23,9 @@ type creditWallet struct {
 }
 
 type Controller struct {
-	CreateCustomer *application.CreateCustomerHandler
-	ListCustomers  *application.ListCustomersHandler
-	CreditWallet   *application.CreditWalletHandler
+	CreateCustomer *application2.CreateCustomerHandler
+	ListCustomers  *application2.ListCustomersHandler
+	CreditWallet   *application2.CreditWalletHandler
 }
 
 func (c *Controller) CreateCustomerHandler(ctx *gin.Context) {
@@ -35,7 +35,7 @@ func (c *Controller) CreateCustomerHandler(ctx *gin.Context) {
 		return
 	}
 
-	createCmd := &application.CreateCustomerCmd{
+	createCmd := &application2.CreateCustomerCmd{
 		FullName: in.Name,
 		Email:    in.Email,
 		Phone:    in.Phone,
@@ -65,18 +65,18 @@ func (c *Controller) CreditWalletHandler(ctx *gin.Context) {
 		return
 	}
 
-	currency, err := money.CurrencyFromString(in.Currency)
+	currency, err := money2.CurrencyFromString(in.Currency)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": "invalid currency"})
 		return
 	}
 
-	amount := money.Money{
+	amount := money2.Money{
 		Amount:   decimal.NewFromFloat32(in.Amount),
 		Currency: currency,
 	}
 
-	creditWalletCmd := &application.CreditWalletCmd{
+	creditWalletCmd := &application2.CreditWalletCmd{
 		CustomerID: id,
 		Money:      amount,
 	}
@@ -91,7 +91,7 @@ func (c *Controller) CreditWalletHandler(ctx *gin.Context) {
 }
 
 func (c *Controller) ListCustomersHandler(ctx *gin.Context) {
-	customers, err := c.ListCustomers.Handle(ctx, &application.ListCustomersCmd{})
+	customers, err := c.ListCustomers.Handle(ctx, &application2.ListCustomersCmd{})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

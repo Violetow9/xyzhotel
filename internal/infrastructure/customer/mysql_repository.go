@@ -4,9 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-
-	"xyzhotel/domain/customer"
-	"xyzhotel/infrastructure/mysql/sqldb"
+	"xyzhotel/internal/domain/customer"
+	sqldb2 "xyzhotel/internal/infrastructure/mysql/sqldb"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -19,11 +18,11 @@ var (
 
 type Repository struct {
 	db *sql.DB
-	q  *sqldb.Queries
+	q  *sqldb2.Queries
 }
 
 func NewCustomerRepository(db *sql.DB) *Repository {
-	return &Repository{db: db, q: sqldb.New(db)}
+	return &Repository{db: db, q: sqldb2.New(db)}
 }
 
 /* ===== CRUD ===== */
@@ -67,7 +66,7 @@ func (r *Repository) ListCustomers(ctx context.Context) ([]customer.Customer, er
 }
 
 func (r *Repository) CreateCustomer(ctx context.Context, c *customer.Customer) error {
-	err := r.q.CreateCustomer(ctx, sqldb.CreateCustomerParams{
+	err := r.q.CreateCustomer(ctx, sqldb2.CreateCustomerParams{
 		ID:         c.ID.String(),
 		Email:      c.Email,
 		Phone:      c.Phone,
@@ -81,7 +80,7 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *customer.Customer) e
 }
 
 func (r *Repository) UpdateCustomer(ctx context.Context, c *customer.Customer) error {
-	aff, err := r.q.UpdateCustomer(ctx, sqldb.UpdateCustomerParams{
+	aff, err := r.q.UpdateCustomer(ctx, sqldb2.UpdateCustomerParams{
 		Email:      c.Email,
 		Phone:      c.Phone,
 		FullName:   c.FullName,

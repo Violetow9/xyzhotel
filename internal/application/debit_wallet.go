@@ -3,14 +3,13 @@ package application
 import (
 	"context"
 	"errors"
-
-	"xyzhotel/domain/customer"
-	"xyzhotel/domain/money"
+	customer2 "xyzhotel/internal/domain/customer"
+	money2 "xyzhotel/internal/domain/money"
 )
 
 type DebitWalletCmd struct {
-	CustomerID customer.ID
-	Money      money.Money
+	CustomerID customer2.ID
+	Money      money2.Money
 }
 
 var (
@@ -18,7 +17,7 @@ var (
 )
 
 type DebitWallerHandler struct {
-	CustomerService *customer.Service
+	CustomerService *customer2.Service
 }
 
 func (h DebitWallerHandler) Handle(ctx context.Context, cmd *DebitWalletCmd) error {
@@ -27,7 +26,7 @@ func (h DebitWallerHandler) Handle(ctx context.Context, cmd *DebitWalletCmd) err
 		return err
 	}
 
-	converter, err := money.CurrencyToConverter(cmd.Money.Currency)
+	converter, err := money2.CurrencyToConverter(cmd.Money.Currency)
 	if err != nil {
 		return err
 	}

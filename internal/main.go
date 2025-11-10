@@ -3,10 +3,10 @@ package main
 import (
 	_ "fmt"
 	"log"
-	"xyzhotel/application"
-	"xyzhotel/domain/customer"
-	infraCustomer "xyzhotel/infrastructure/customer"
-	"xyzhotel/infrastructure/mysql"
+	"xyzhotel/internal/application"
+	"xyzhotel/internal/domain/customer"
+	customer2 "xyzhotel/internal/infrastructure/customer"
+	"xyzhotel/internal/infrastructure/mysql"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,16 +17,23 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 
-	customerRepository := infraCustomer.NewCustomerRepository(db)
+	customerRepository := customer2.NewCustomerRepository(db)
 	customerService := &customer.Service{
 		Repository: customerRepository,
+	}
+	createCustomerHandler := &application.CreateCustomerHandler{
+		CustomerRepository: customerRepository,
+	}
+	listCustomersHandler := &application.ListCustomersHandler{
+		CustomerRepository: customerRepository,
 	}
 	creditWalletHandler := &application.CreditWalletHandler{
 		CustomerService: customerService,
 	}
-	customerController := &infraCustomer.Controller{
-		CustomerService: customerService,
-		CreditWallet:    creditWalletHandler,
+	customerController := &customer2.Controller{
+		CreateCustomer: createCustomerHandler,
+		ListCustomers:  listCustomersHandler,
+		CreditWallet:   creditWalletHandler,
 	}
 
 	gin.SetMode(gin.DebugMode)

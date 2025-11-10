@@ -2,8 +2,8 @@ package reservation
 
 import (
 	"time"
-	"xyzhotel/domain/customer"
-	"xyzhotel/domain/room"
+	"xyzhotel/internal/domain/customer"
+	"xyzhotel/internal/domain/room"
 
 	"github.com/google/uuid"
 )

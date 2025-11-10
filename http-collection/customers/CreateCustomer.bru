@@ -1,0 +1,19 @@
+meta {
+  name: CreateCustomer
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{HOST}}/customers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "test2@gmail.com",
+    "phone": "0909090909",
+    "name": "Jean"
+  }
+}

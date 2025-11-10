@@ -1,0 +1,19 @@
+meta {
+  name: CreditWallet
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{HOST}}/customers/wallet/credit
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "id": "9fa373df-f1c7-431e-a667-63a318d3ae62",
+    "amount": 20,
+    "currency": "EUR"
+  }
+}

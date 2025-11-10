@@ -1,0 +1,18 @@
+version: "2"
+sql:
+  - engine: "mysql"
+    schema: "db/schema.sql"
+    queries: "db/queries"
+    gen:
+      go:
+        package: "sqldb"
+        out: "infrastructure/mysql/sqldb"
+        emit_json_tags: true
+        overrides:
+          - db_type: "DECIMAL"
+            go_type:
+              import: "github.com/shopspring/decimal"
+              type: "Decimal"
+          - db_type: "TINYINT"
+            go_type:
+              type: "bool"

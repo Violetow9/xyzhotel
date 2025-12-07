@@ -3,37 +3,44 @@ package application
 import (
 	"context"
 	"errors"
-	customer2 "xyzhotel/internal/domain/customer"
+	"fmt"
+
+	"xyzhotel/internal/domain/customer"
 
 	"github.com/google/uuid"
 )
 
 type CreateCustomerCmd struct {
 	FullName string
-	Email    customer2.Email
-	Phone    customer2.Email
+	Email    customer.Email
+	Phone    customer.Phone
 }
 
-func (cc *CreateCustomerCmd) IsEmpty() bool {
-	return cc.FullName == "" || cc.Email == "" || cc.Phone == ""
+func (cc *CreateCustomerCmd) Validate() error {
+	if cc.FullName == "" || cc.Email == "" || cc.Phone == "" {
+		return errors.New("customer fields cannot be empty")
+	}
+	return nil
 }
 
 var (
 	ErrCustomerAlreadyExists = errors.New("customer already exists")
-	ErrCustomerFieldEmpty    = errors.New("customer field is empty")
 )
 
 type CreateCustomerHandler struct {
-	CustomerRepository customer2.Repository
+	CustomerRepository customer.Repository
 }
 
-func (h CreateCustomerHandler) Handle(ctx context.Context, cmd *CreateCustomerCmd) (*customer2.Customer, error) {
-	if cmd.IsEmpty() {
-		return nil, ErrCustomerFieldEmpty
+func (h CreateCustomerHandler) Handle(ctx context.Context, cmd *CreateCustomerCmd) (*customer.Customer, error) {
+	if err := cmd.Validate(); err != nil {
+		return nil, err
 	}
 
-	cust, err := h.CustomerRepository.GetCustomerByEmail(ctx, cmd.Email)
-	if err == nil && cust != nil {
+	existing, err := h.CustomerRepository.GetCustomerByEmail(ctx, cmd.Email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check customer existence: %w", err)
+	}
+	if existing != nil {
 		return nil, ErrCustomerAlreadyExists
 	}
 
@@ -42,16 +49,17 @@ func (h CreateCustomerHandler) Handle(ctx context.Context, cmd *CreateCustomerCm
 		return nil, err
 	}
 
-	cust = &customer2.Customer{
-		ID:       id,
-		FullName: cmd.FullName,
-		Email:    cmd.Email,
-		Phone:    cmd.Phone,
-		Wallet:   customer2.ZeroWallet(),
+	cust := customer.NewCustomer(
+		id,
+		cmd.FullName,
+		cmd.Email,
+		cmd.Phone,
+		customer.ZeroWallet(),
+	)
+
+	if err := h.CustomerRepository.CreateCustomer(ctx, cust); err != nil {
+		return nil, fmt.Errorf("failed to create customer: %w", err)
 	}
-	err = h.CustomerRepository.CreateCustomer(ctx, cust)
-	if err != nil {
-		return nil, err
-	}
+
 	return cust, nil
 }

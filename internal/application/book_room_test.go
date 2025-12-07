@@ -5,175 +5,199 @@ import (
 	"errors"
 	"testing"
 	"time"
-	customer2 "xyzhotel/internal/domain/customer"
-	reservation2 "xyzhotel/internal/domain/reservation"
-	room2 "xyzhotel/internal/domain/room"
+
+	"xyzhotel/internal/domain/customer"
+	"xyzhotel/internal/domain/money"
+	"xyzhotel/internal/domain/room"
 
 	"github.com/google/uuid"
 )
 
 func TestBookRoomHandler_CheckInDateInPast(t *testing.T) {
-	// Given a book room handler
-	// And a check-in date in the past
-	ctx := context.Background()
-	repository := customer2.NewFakeRepository()
-	bookRoomHandler := &BookRoomHandler{
-		CustomerRepository: repository,
-		ReservationService: nil,
-		RoomRepository:     nil,
+	handler := &BookRoomHandler{}
+	cmd := &BookRoomCmd{
+		CheckInDate:    time.Now().AddDate(0, 0, -1),
+		AmountOfNights: 1,
+		RoomNumbers:    []string{"101"},
 	}
 
-	// When booking a room
-	_, err := bookRoomHandler.Handle(ctx, &BookRoomCmd{
-		CustomerID:     customer2.ID{},
-		CheckInDate:    time.Now().AddDate(0, 0, -1), // Yesterday
-		AmountOfNights: 2,
-		Rooms:          []room2.ID{},
-	})
+	_, err := handler.Handle(context.Background(), cmd)
 
-	// Then expect an ErrCheckInDateInPast error
 	if !errors.Is(err, ErrCheckInDateInPast) {
-		t.Errorf("expected ErrCheckInDateInPast, but got: %v", err)
+		t.Errorf("expected ErrCheckInDateInPast, got %v", err)
 	}
 }
 
 func TestBookRoomHandler_NoRoomsSelected(t *testing.T) {
-	// Given a book room handler
-	// And no rooms selected
-	ctx := context.Background()
-	repository := customer2.NewFakeRepository()
-	bookRoomHandler := &BookRoomHandler{
-		CustomerRepository: repository,
-		ReservationService: nil,
-		RoomRepository:     nil,
+	handler := &BookRoomHandler{}
+	cmd := &BookRoomCmd{
+		CheckInDate:    time.Now().AddDate(0, 0, 1),
+		AmountOfNights: 1,
+		RoomNumbers:    []string{},
 	}
 
-	// When booking a room
-	_, err := bookRoomHandler.Handle(ctx, &BookRoomCmd{
-		CustomerID:     customer2.ID{},
-		CheckInDate:    time.Now().AddDate(0, 0, 1),
-		AmountOfNights: 2,
-		Rooms:          []room2.ID{},
-	})
+	_, err := handler.Handle(context.Background(), cmd)
 
-	// Then expect an ErrNoRoomsSelected error
 	if !errors.Is(err, ErrNoRoomsSelected) {
-		t.Errorf("expected ErrNoRoomsSelected, but got: %v", err)
+		t.Errorf("expected ErrNoRoomsSelected, got %v", err)
 	}
 }
 
 func TestBookRoomHandler_AmountOfNightsZero(t *testing.T) {
-	// Given a book room handler
-	// And an amount of nights equal to zero
-	ctx := context.Background()
-	repository := customer2.NewFakeRepository()
-	bookRoomHandler := &BookRoomHandler{
-		CustomerRepository: repository,
-		ReservationService: nil,
-		RoomRepository:     nil,
-	}
-
-	// When booking a room
-	_, err := bookRoomHandler.Handle(ctx, &BookRoomCmd{
-		CustomerID:     customer2.ID{},
+	handler := &BookRoomHandler{}
+	cmd := &BookRoomCmd{
 		CheckInDate:    time.Now().AddDate(0, 0, 1),
 		AmountOfNights: 0,
-		Rooms:          []room2.ID{uuid.New()},
-	})
+		RoomNumbers:    []string{"101"},
+	}
 
-	// Then expect an ErrAmountOfNightsZero error
+	_, err := handler.Handle(context.Background(), cmd)
+
 	if !errors.Is(err, ErrAmountOfNightsZero) {
-		t.Errorf("expected ErrAmountOfNightsZero, but got: %v", err)
+		t.Errorf("expected ErrAmountOfNightsZero, got %v", err)
 	}
 }
 
-func TestBookRoomHandler_NonExistingCustomer(t *testing.T) {
-	// Given a book room handler
-	// And a customer ID that does not exist
-	ctx := context.Background()
-	repository := customer2.NewFakeRepository()
-	bookRoomHandler := &BookRoomHandler{
-		CustomerRepository: repository,
-		ReservationService: nil,
-		RoomRepository:     nil,
-	}
+func TestBookRoomHandler_CustomerNotFound(t *testing.T) {
+	custRepo := NewMockCustomerRepo()
+	handler := &BookRoomHandler{CustomerRepository: custRepo}
 
-	// When booking a room
-	_, err := bookRoomHandler.Handle(ctx, &BookRoomCmd{
+	cmd := &BookRoomCmd{
 		CustomerID:     uuid.New(),
 		CheckInDate:    time.Now().AddDate(0, 0, 1),
-		AmountOfNights: 2,
-		Rooms:          []room2.ID{uuid.New()},
-	})
+		AmountOfNights: 1,
+		RoomNumbers:    []string{"101"},
+	}
 
-	// Then expect an ErrCustomerNotFound error
-	if !errors.Is(err, customer2.ErrCustomerNotFound) {
-		t.Errorf("expected ErrCustomerNotFound, but got: %v", err)
+	_, err := handler.Handle(context.Background(), cmd)
+
+	if err == nil {
+		t.Error("expected error for non-existing customer")
 	}
 }
 
-func TestBookRoomHandler_OccupiedRooms(t *testing.T) {
-	// Given a book room handler
-	// And rooms that are already booked
-	ctx := context.Background()
-	customerRepository := customer2.NewFakeRepository()
-	customerA := &customer2.Customer{
-		ID: uuid.New(),
+func TestBookRoomHandler_RoomNotAvailable(t *testing.T) {
+	custID := uuid.New()
+	cust := customer.NewCustomer(custID, "John", "john@test.com", "123", customer.ZeroWallet())
+
+	custRepo := NewMockCustomerRepo()
+	custRepo.CreateCustomer(context.Background(), cust)
+
+	roomRepo := NewMockRoomRepo()
+	roomRepo.Rooms["101"] = &room.Room{ID: "101", Type: room.Standard}
+
+	resRepo := NewMockReservationRepo()
+	resRepo.ForceAvailability = false // Force l'indisponibilité
+
+	handler := &BookRoomHandler{
+		CustomerRepository: custRepo,
+		RoomRepository:     roomRepo,
+		ReservationRepo:    resRepo,
 	}
-	customerB := &customer2.Customer{
-		ID: uuid.New(),
+
+	cmd := &BookRoomCmd{
+		CustomerID:     custID,
+		CheckInDate:    time.Now().AddDate(0, 0, 1),
+		AmountOfNights: 1,
+		RoomNumbers:    []string{"101"},
 	}
-	err := customerRepository.CreateCustomer(ctx, customerA)
+
+	_, err := handler.Handle(context.Background(), cmd)
+
+	if err == nil {
+		t.Error("expected error when room is not available")
+	}
+}
+
+func TestBookRoomHandler_InsufficientFunds(t *testing.T) {
+	custID := uuid.New()
+	cust := customer.NewCustomer(custID, "John", "john@test.com", "123", customer.ZeroWallet())
+
+	custRepo := NewMockCustomerRepo()
+	custRepo.CreateCustomer(context.Background(), cust)
+
+	roomRepo := NewMockRoomRepo()
+	roomRepo.Rooms["101"] = &room.Room{ID: "101", Type: room.Standard} // 50 EUR
+
+	resRepo := NewMockReservationRepo()
+
+	debitHandler := &DebitWalletHandler{
+		CustomerRepo: custRepo,
+		Converter:    money.NewConverter(),
+	}
+
+	handler := &BookRoomHandler{
+		CustomerRepository: custRepo,
+		RoomRepository:     roomRepo,
+		ReservationRepo:    resRepo,
+		DebitWallet:        debitHandler,
+	}
+
+	// Prix total 50 EUR, Acompte 25 EUR, Wallet 0 EUR
+	cmd := &BookRoomCmd{
+		CustomerID:     custID,
+		CheckInDate:    time.Now().AddDate(0, 0, 1),
+		AmountOfNights: 1,
+		RoomNumbers:    []string{"101"},
+	}
+
+	_, err := handler.Handle(context.Background(), cmd)
+
+	if !errors.Is(err, ErrInsufficientFunds) {
+		t.Errorf("expected ErrInsufficientFunds, got %v", err)
+	}
+}
+
+func TestBookRoomHandler_Success(t *testing.T) {
+	custID := uuid.New()
+	wallet := customer.NewWallet(10000) // 100 EUR
+	cust := customer.NewCustomer(custID, "John", "john@test.com", "123", wallet)
+
+	custRepo := NewMockCustomerRepo()
+	custRepo.CreateCustomer(context.Background(), cust)
+
+	roomRepo := NewMockRoomRepo()
+	roomRepo.Rooms["101"] = &room.Room{ID: "101", Type: room.Standard} // 50 EUR/nuit
+
+	resRepo := NewMockReservationRepo()
+
+	debitHandler := &DebitWalletHandler{
+		CustomerRepo: custRepo,
+		Converter:    money.NewConverter(),
+	}
+
+	handler := &BookRoomHandler{
+		CustomerRepository: custRepo,
+		RoomRepository:     roomRepo,
+		ReservationRepo:    resRepo,
+		DebitWallet:        debitHandler,
+	}
+
+	// 1 nuit = 50 EUR, Acompte = 25 EUR.
+	cmd := &BookRoomCmd{
+		CustomerID:     custID,
+		CheckInDate:    time.Now().AddDate(0, 0, 1),
+		AmountOfNights: 1,
+		RoomNumbers:    []string{"101"},
+	}
+
+	resIDs, err := handler.Handle(context.Background(), cmd)
+
 	if err != nil {
-		t.Fatalf("failed to set up customer A: %v", err)
-	}
-	err = customerRepository.CreateCustomer(ctx, customerB)
-	if err != nil {
-		t.Fatalf("failed to set up customer B: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	roomRepository := room2.NewFakeRepository()
-	reservationRepository := reservation2.NewFakeRepository()
-	reservationService := &reservation2.Service{
-		ReservationRepository: reservationRepository,
-		RoomRepository:        roomRepository,
-	}
-	CheckInDate := time.Now().AddDate(0, 0, 1)
-	roomID := uuid.New()
-	err = reservationService.CreateReservation(ctx, &reservation2.Reservation{
-		ID:             uuid.New(),
-		Customer:       customerA,
-		CheckInDate:    CheckInDate,
-		AmountOfNights: 2,
-		Rooms: []*room2.Room{
-			{ID: roomID},
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to set up existing reservation: %v", err)
+	if len(resIDs) != 1 {
+		t.Errorf("expected 1 reservation, got %d", len(resIDs))
 	}
 
-	bookRoomHandler := &BookRoomHandler{
-		CustomerRepository: customerRepository,
-		ReservationService: reservationService,
-		RoomRepository:     roomRepository,
+	if len(resRepo.Reservations) != 1 {
+		t.Error("reservation was not saved in repo")
 	}
 
-	// When booking a room
-	var res *reservation2.Reservation
-	res, err = bookRoomHandler.Handle(ctx, &BookRoomCmd{
-		CustomerID:     customerB.ID,
-		CheckInDate:    CheckInDate,
-		AmountOfNights: 2,
-		Rooms:          []room2.ID{roomID},
-	})
-
-	// Then expect an ErrRoomAlreadyBooked error
-	if !errors.Is(err, ErrRoomAlreadyBooked) {
-		t.Errorf("expected ErrRoomAlreadyBooked, but got: %v", err)
-	}
-
-	if res == nil {
-		t.Errorf("expected no reservation to be created, but got one")
+	updatedCust, _ := custRepo.GetCustomerByID(context.Background(), custID)
+	// 100 EUR - 25 EUR = 75 EUR (7500 cents)
+	if updatedCust.Wallet.Balance() != 7500 {
+		t.Errorf("expected wallet balance 7500, got %d", updatedCust.Wallet.Balance())
 	}
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func OpenFromEnv() (*sql.DB, error) {
-	dsn := os.Getenv("DB_DSN") // app:app@tcp(mysql:3306)/app?parseTime=true&charset=utf8mb4&loc=UTC
+	dsn := os.Getenv("DB_DSN")
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err

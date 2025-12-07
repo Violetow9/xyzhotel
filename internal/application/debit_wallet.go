@@ -3,38 +3,47 @@ package application
 import (
 	"context"
 	"errors"
-	customer2 "xyzhotel/internal/domain/customer"
-	money2 "xyzhotel/internal/domain/money"
+	"fmt"
+	"xyzhotel/internal/domain/customer"
+	"xyzhotel/internal/domain/money"
 )
 
 type DebitWalletCmd struct {
-	CustomerID customer2.ID
-	Money      money2.Money
+	CustomerID customer.ID
+	Money      money.Money
 }
 
 var (
 	ErrInsufficientFunds = errors.New("not sufficient funds")
 )
 
-type DebitWallerHandler struct {
-	CustomerService *customer2.Service
+type DebitWalletHandler struct {
+	CustomerRepo customer.Repository
+	Converter    *money.Converter
 }
 
-func (h DebitWallerHandler) Handle(ctx context.Context, cmd *DebitWalletCmd) error {
-	cust, err := h.CustomerService.GetCustomerByID(ctx, cmd.CustomerID)
+func (h DebitWalletHandler) Handle(ctx context.Context, cmd *DebitWalletCmd) error {
+	cust, err := h.CustomerRepo.GetCustomerByID(ctx, cmd.CustomerID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch customer: %w", err)
 	}
 
-	converter, err := money2.CurrencyToConverter(cmd.Money.Currency)
+	amountInEuros, err := h.Converter.ConvertToEUR(cmd.Money)
 	if err != nil {
-		return err
+		return fmt.Errorf("conversion failed: %w", err)
 	}
 
-	convertedAmount := converter.Convert(cmd.Money)
-	if !cust.Wallet.HasSufficientFunds(convertedAmount) {
+	if !cust.Wallet.HasSufficientFunds(amountInEuros.AmountCents) {
 		return ErrInsufficientFunds
 	}
-	cust.Wallet.Debit(convertedAmount)
-	return h.CustomerService.UpdateCustomer(ctx, cust)
+
+	if err := cust.Wallet.Debit(amountInEuros.AmountCents); err != nil {
+		return err
+	}
+
+	if err := h.CustomerRepo.UpdateCustomer(ctx, cust); err != nil {
+		return fmt.Errorf("failed to update customer: %w", err)
+	}
+
+	return nil
 }

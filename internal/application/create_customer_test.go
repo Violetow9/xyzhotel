@@ -4,108 +4,82 @@ import (
 	"context"
 	"errors"
 	"testing"
-	customer2 "xyzhotel/internal/domain/customer"
+
+	"xyzhotel/internal/domain/customer"
 
 	"github.com/google/uuid"
 )
 
-func TestCreateCustomerHandler_EmailAlreadyExists(t *testing.T) {
-	// Given a create customer handler
-	// And an email that already exists in the Repository
-	ctx := context.Background()
-	email := "existingemail@gmail.com"
-	repository := customer2.NewFakeRepositoryWithCustomers(&customer2.Customer{
-		ID:       uuid.New(),
-		FullName: "ExistingUser",
-		Email:    email,
-		Phone:    "1234567890",
-		Wallet:   customer2.ZeroWallet(),
-	})
-	createCustomerHandler := &CreateCustomerHandler{
-		CustomerRepository: repository,
-	}
+func TestCreateCustomerHandler_EmptyFields(t *testing.T) {
+	handler := &CreateCustomerHandler{}
 
-	// When creating a new customer with that email
-	cust, err := createCustomerHandler.Handle(ctx, &CreateCustomerCmd{
-		FullName: "NewCustomer",
-		Email:    email,
-		Phone:    "0987654321",
-	})
-	if err == nil {
-		t.Errorf("expected error but got none")
-	}
-	if cust != nil {
-		t.Errorf("expected no customer to be created, but got one")
-	}
-
-	// Then expect an ErrCustomerAlreadyExists error
-	if !errors.Is(err, ErrCustomerAlreadyExists) {
-		t.Errorf("expected ErrCustomerAlreadyExists, but got: %v", err)
-	}
-}
-
-func TestCreateCustomerHandler_FieldEmpty(t *testing.T) {
-	// Given a create customer handler
-	// And a customer with an empty full name
-	ctx := context.Background()
-	repository := customer2.NewFakeRepository()
-	createCustomerHandler := &CreateCustomerHandler{
-		CustomerRepository: repository,
-	}
-
-	// When creating a new customer with empty fields
-	cust, err := createCustomerHandler.Handle(ctx, &CreateCustomerCmd{
+	cmd := &CreateCustomerCmd{
 		FullName: "",
 		Email:    "",
 		Phone:    "",
-	})
-	if err == nil {
-		t.Errorf("expected error but got none")
-	}
-	if cust != nil {
-		t.Errorf("expected no customer to be created, but got one")
 	}
 
-	// Then expect an ErrCustomerFieldEmpty error
-	if !errors.Is(err, ErrCustomerFieldEmpty) {
-		t.Errorf("expected ErrCustomerFieldEmpty, but got: %v", err)
+	_, err := handler.Handle(context.Background(), cmd)
+
+	if err == nil {
+		t.Error("expected error for empty fields")
 	}
 }
 
-func TestCreateCustomerHandler_NonExistingAccount(t *testing.T) {
-	// Given a customer service
-	// And an email that does not exist in the Repository
-	ctx := context.Background()
-	repository := customer2.NewFakeRepository()
-	createCustomerHandler := &CreateCustomerHandler{
-		CustomerRepository: repository,
+func TestCreateCustomerHandler_CustomerAlreadyExists(t *testing.T) {
+	repo := NewMockCustomerRepo()
+	existingEmail := "alice@example.com"
+
+	existingCustomer := customer.NewCustomer(
+		uuid.New(),
+		"Alice",
+		existingEmail,
+		"123456789",
+		customer.ZeroWallet(),
+	)
+	repo.CreateCustomer(context.Background(), existingCustomer)
+
+	handler := &CreateCustomerHandler{CustomerRepository: repo}
+
+	cmd := &CreateCustomerCmd{
+		FullName: "Alice Duplicate",
+		Email:    existingEmail,
+		Phone:    "987654321",
 	}
 
-	// When creating a new customer
-	cust, err := createCustomerHandler.Handle(ctx, &CreateCustomerCmd{
-		FullName: "Alice",
-		Email:    "alice@gmail.com",
-		Phone:    "1234567890",
-	})
+	_, err := handler.Handle(context.Background(), cmd)
+
+	if !errors.Is(err, ErrCustomerAlreadyExists) {
+		t.Errorf("expected ErrCustomerAlreadyExists, got %v", err)
+	}
+}
+
+func TestCreateCustomerHandler_Success(t *testing.T) {
+	repo := NewMockCustomerRepo()
+	handler := &CreateCustomerHandler{CustomerRepository: repo}
+
+	cmd := &CreateCustomerCmd{
+		FullName: "Bob",
+		Email:    "bob@example.com",
+		Phone:    "123456789",
+	}
+
+	cust, err := handler.Handle(context.Background(), cmd)
+
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Then expect the customer to be created successfully
-	if cust == nil {
-		t.Errorf("expected customer to be created, but got nil")
-		return
+	if cust.ID == uuid.Nil {
+		t.Error("expected valid UUID")
 	}
 
-	if cust.Email != "alice@gmail.com" {
-		t.Errorf("expected customer email to be alice@gmail.com, but got %s", cust.Email)
+	if cust.Wallet.Balance() != 0 {
+		t.Error("new customer should have zero balance")
 	}
 
-	if cust.FullName != "Alice" {
-		t.Errorf("expected customer full name to be Alice, but got %s", cust.FullName)
-	}
-
-	if cust.Phone != "1234567890" {
-		t.Errorf("expected customer phone to be 1234567890, but got %s", cust.Phone)
+	savedCust, _ := repo.GetCustomerByID(context.Background(), cust.ID)
+	if savedCust == nil {
+		t.Error("customer was not saved in repository")
 	}
 }

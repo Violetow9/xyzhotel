@@ -2,31 +2,37 @@ package application
 
 import (
 	"context"
-	customer2 "xyzhotel/internal/domain/customer"
-	money2 "xyzhotel/internal/domain/money"
+	"fmt"
+	"xyzhotel/internal/domain/customer"
+	"xyzhotel/internal/domain/money"
 )
 
 type CreditWalletCmd struct {
-	CustomerID customer2.ID
-	Money      money2.Money
+	CustomerID customer.ID
+	Money      money.Money
 }
 
 type CreditWalletHandler struct {
-	CustomerService *customer2.Service
+	CustomerRepo customer.Repository // On utilise le Repo, pas le Service (si possible)
+	Converter    *money.Converter
 }
 
 func (h CreditWalletHandler) Handle(ctx context.Context, cmd *CreditWalletCmd) error {
-	cust, err := h.CustomerService.GetCustomerByID(ctx, cmd.CustomerID)
+	cust, err := h.CustomerRepo.GetCustomerByID(ctx, cmd.CustomerID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch customer: %w", err)
 	}
 
-	converter, err := money2.CurrencyToConverter(cmd.Money.Currency)
+	amountInEuros, err := h.Converter.ConvertToEUR(cmd.Money)
 	if err != nil {
-		return err
+		return fmt.Errorf("conversion failed: %w", err)
 	}
 
-	convertedAmount := converter.Convert(cmd.Money)
-	cust.Wallet.Credit(convertedAmount)
-	return h.CustomerService.UpdateCustomer(ctx, cust)
+	cust.Wallet.Credit(amountInEuros.AmountCents)
+
+	if err := h.CustomerRepo.UpdateCustomer(ctx, cust); err != nil {
+		return fmt.Errorf("failed to update customer: %w", err)
+	}
+
+	return nil
 }

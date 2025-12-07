@@ -1,32 +1,38 @@
 package money
 
 import (
-	"github.com/shopspring/decimal"
+	"errors"
+	"math"
 )
 
+var ErrUnsupportedCurrency = errors.New("unsupported currency")
+
 type Converter struct {
-	FromDevise Currency
-	ToDevise   Currency
-	Rate       decimal.Decimal
+	rates map[Currency]float64
 }
 
-func NewDeviseConverter(from Currency, to Currency, rate decimal.Decimal) *Converter {
+func NewConverter() *Converter {
 	return &Converter{
-		FromDevise: from,
-		ToDevise:   to,
-		Rate:       rate,
+		rates: map[Currency]float64{
+			EUR: 1.0,
+			USD: 0.85,   // 1 USD = 0.85 EUR
+			GBP: 1.17,   // 1 GBP = 1.17 EUR
+			JPY: 0.0077, // 1 JPY = 0.0077 EUR
+			CHF: 0.92,   // 1 CHF = 0.92 EUR
+		},
 	}
 }
 
-func (wc *Converter) Convert(money Money) decimal.Decimal {
-	return money.Amount.Mul(wc.Rate)
-}
+func (c *Converter) ConvertToEUR(money Money) (Money, error) {
+	rate, exists := c.rates[money.Currency]
+	if !exists {
+		return Money{}, ErrUnsupportedCurrency
+	}
 
-var (
-	USDToEURRate      = decimal.NewFromFloat(0.85)
-	USDToEURConverter = NewDeviseConverter(USD, EUR, USDToEURRate)
-	EURToEURConverter = NewDeviseConverter(EUR, EUR, decimal.NewFromInt(1))
-	LSToEURConverter  = NewDeviseConverter(LS, EUR, decimal.NewFromFloat(1.17))
-	YENToEURConverter = NewDeviseConverter(YEN, EUR, decimal.NewFromFloat(0.0077))
-	FSToEURConverter  = NewDeviseConverter(FS, EUR, decimal.NewFromFloat(0.92))
-)
+	convertedAmount := math.Round(float64(money.AmountCents) * rate)
+
+	return Money{
+		AmountCents: int(convertedAmount),
+		Currency:    EUR,
+	}, nil
+}

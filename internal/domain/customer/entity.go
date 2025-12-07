@@ -1,22 +1,56 @@
 package customer
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 type ID = uuid.UUID
 type Email = string
 type Phone = string
 
-type Wallet struct{ Sold decimal.Decimal }
+var (
+	ErrInsufficientFunds = errors.New("insufficient funds in wallet")
+)
 
-func NewWallet(initial decimal.Decimal) *Wallet             { return &Wallet{Sold: initial} }
-func ZeroWallet() *Wallet                                   { return NewWallet(decimal.Zero) }
-func (w *Wallet) Balance() decimal.Decimal                  { return w.Sold }
-func (w *Wallet) Credit(amount decimal.Decimal)             { w.Sold = w.Sold.Add(amount) }
-func (w *Wallet) Debit(amount decimal.Decimal)              { w.Sold = w.Sold.Sub(amount) }
-func (w *Wallet) HasSufficientFunds(a decimal.Decimal) bool { return w.Sold.GreaterThanOrEqual(a) }
+type Wallet struct {
+	BalanceCents int
+}
+
+func NewWallet(initialCents int) *Wallet {
+	return &Wallet{BalanceCents: initialCents}
+}
+
+func ZeroWallet() *Wallet {
+	return NewWallet(0)
+}
+
+func (w *Wallet) Balance() int {
+	return w.BalanceCents
+}
+
+func (w *Wallet) Credit(amountCents int) {
+	if amountCents < 0 {
+		return
+	}
+	w.BalanceCents += amountCents
+}
+
+func (w *Wallet) Debit(amountCents int) error {
+	if amountCents < 0 {
+		return errors.New("cannot debit negative amount")
+	}
+	if !w.HasSufficientFunds(amountCents) {
+		return ErrInsufficientFunds
+	}
+	w.BalanceCents -= amountCents
+	return nil
+}
+
+func (w *Wallet) HasSufficientFunds(amountCents int) bool {
+	return w.BalanceCents >= amountCents
+}
 
 type Customer struct {
 	ID       ID
@@ -27,5 +61,11 @@ type Customer struct {
 }
 
 func NewCustomer(id ID, fullName string, email Email, phone Phone, wallet *Wallet) *Customer {
-	return &Customer{ID: id, FullName: fullName, Email: email, Phone: phone, Wallet: wallet}
+	return &Customer{
+		ID:       id,
+		FullName: fullName,
+		Email:    email,
+		Phone:    phone,
+		Wallet:   wallet,
+	}
 }

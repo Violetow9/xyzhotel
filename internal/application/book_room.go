@@ -3,87 +3,117 @@ package application
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
-	customer2 "xyzhotel/internal/domain/customer"
-	reservation2 "xyzhotel/internal/domain/reservation"
-	room2 "xyzhotel/internal/domain/room"
 
-	"github.com/google/uuid"
+	"xyzhotel/internal/domain/customer"
+	"xyzhotel/internal/domain/money"
+	"xyzhotel/internal/domain/reservation"
+	"xyzhotel/internal/domain/room"
 )
 
 type BookRoomCmd struct {
-	CustomerID     customer2.ID
+	CustomerID     customer.ID
 	CheckInDate    time.Time
-	AmountOfNights uint8
-	Rooms          []room2.ID
+	AmountOfNights int
+	RoomNumbers    []string
 }
 
 var (
-	ErrRoomAlreadyBooked  = errors.New("room already booked for the selected dates")
 	ErrCheckInDateInPast  = errors.New("check-in date cannot be in the past")
 	ErrNoRoomsSelected    = errors.New("no rooms selected for booking")
 	ErrAmountOfNightsZero = errors.New("amount of nights must be greater than zero")
 )
 
 type BookRoomHandler struct {
-	CustomerRepository customer2.Repository
-	ReservationService *reservation2.Service
-	RoomRepository     room2.Repository
+	CustomerRepository customer.Repository
+	ReservationRepo    reservation.Repository
+	RoomRepository     room.Repository
+	DebitWallet        *DebitWalletHandler
 }
 
-func (h BookRoomHandler) Handle(ctx context.Context, cmd *BookRoomCmd) (*reservation2.Reservation, error) {
-	if cmd.CheckInDate.Before(time.Now()) {
-		return nil, ErrCheckInDateInPast
-	}
-
-	if len(cmd.Rooms) == 0 {
+func (h BookRoomHandler) Handle(ctx context.Context, cmd *BookRoomCmd) ([]reservation.ID, error) {
+	if len(cmd.RoomNumbers) == 0 {
 		return nil, ErrNoRoomsSelected
 	}
-
-	if cmd.AmountOfNights == 0 {
+	if cmd.AmountOfNights <= 0 {
 		return nil, ErrAmountOfNightsZero
 	}
 
-	cust, err := h.CustomerRepository.GetCustomerByID(ctx, cmd.CustomerID)
-	if err != nil {
-		return nil, err
+	// Normaliser les dates à minuit pour éviter les problèmes de comparaison
+	today := truncateToDay(time.Now())
+	checkIn := truncateToDay(cmd.CheckInDate)
+
+	if checkIn.Before(today) {
+		return nil, ErrCheckInDateInPast
 	}
 
-	rooms := make([]*room2.Room, 0, len(cmd.Rooms))
-	for _, roomID := range cmd.Rooms {
-		r, err := h.RoomRepository.FindByID(ctx, roomID)
+	if _, err := h.CustomerRepository.GetCustomerByID(ctx, cmd.CustomerID); err != nil {
+		return nil, fmt.Errorf("customer invalid: %w", err)
+	}
+
+	var roomsToBook []room.Room
+	totalDepositCents := 0
+
+	for _, roomNum := range cmd.RoomNumbers {
+		r, err := h.RoomRepository.FindByID(ctx, roomNum)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("room %s not found: %w", roomNum, err)
 		}
-		rooms = append(rooms, r)
-	}
 
-	for _, r := range rooms {
-		isAvailable, err := h.ReservationService.IsRoomAvailable(ctx, r.ID, cmd.CheckInDate, cmd.AmountOfNights)
+		isAvailable, err := h.ReservationRepo.IsRoomAvailable(ctx, string(r.ID), checkIn, cmd.AmountOfNights)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("availability check failed: %w", err)
 		}
 		if !isAvailable {
-			return nil, ErrRoomAlreadyBooked
+			return nil, fmt.Errorf("room %s is not available for these dates", r.ID)
 		}
+
+		roomsToBook = append(roomsToBook, *r)
+
+		config := r.GetConfig()
+		totalPriceRoom := config.PriceCents * cmd.AmountOfNights
+
+		// Acompte de 50%
+		depositRoom := totalPriceRoom / 2
+		totalDepositCents += depositRoom
 	}
 
-	id, err := uuid.NewRandom()
-	if err != nil {
+	debitCmd := &DebitWalletCmd{
+		CustomerID: cmd.CustomerID,
+		Money: money.Money{
+			AmountCents: totalDepositCents,
+			Currency:    money.EUR,
+		},
+	}
+
+	if err := h.DebitWallet.Handle(ctx, debitCmd); err != nil {
 		return nil, err
 	}
 
-	res := &reservation2.Reservation{
-		ID:             id,
-		Customer:       cust,
-		CheckInDate:    cmd.CheckInDate,
-		AmountOfNights: cmd.AmountOfNights,
-		Rooms:          rooms,
+	var createdReservationIDs []reservation.ID
+
+	for _, r := range roomsToBook {
+		res, err := reservation.NewReservation(
+			cmd.CustomerID,
+			string(r.ID),
+			r.GetConfig().PriceCents,
+			checkIn,
+			cmd.AmountOfNights,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := h.ReservationRepo.Save(ctx, res); err != nil {
+			return nil, fmt.Errorf("failed to save reservation: %w", err)
+		}
+		createdReservationIDs = append(createdReservationIDs, res.ID)
 	}
 
-	err = h.ReservationService.CreateReservation(ctx, res)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
+	return createdReservationIDs, nil
+}
+
+func truncateToDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }

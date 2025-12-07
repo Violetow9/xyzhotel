@@ -1,0 +1,20 @@
+meta {
+  name: make a reservation
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{HOST}}/reservations
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "customer_id": "c965b79e-d829-4eea-8559-8f957c74d9c2",
+    "check_in_date": "2026-01-05",
+    "amount_of_nights": 2,
+    "rooms": ["101"]
+  }
+}

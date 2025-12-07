@@ -10,45 +10,31 @@ import (
 )
 
 const createCustomer = `-- name: CreateCustomer :exec
-INSERT INTO customers (id, email, phone, full_name, wallet_sold)
+INSERT INTO customers (id, full_name, email, phone, balance_cents)
 VALUES (?, ?, ?, ?, ?)
 `
 
 type CreateCustomerParams struct {
-	ID         string `json:"id"`
-	Email      string `json:"email"`
-	Phone      string `json:"phone"`
-	FullName   string `json:"full_name"`
-	WalletSold string `json:"wallet_sold"`
+	ID           string `json:"id"`
+	FullName     string `json:"full_name"`
+	Email        string `json:"email"`
+	Phone        string `json:"phone"`
+	BalanceCents int32  `json:"balance_cents"`
 }
 
 func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) error {
 	_, err := q.db.ExecContext(ctx, createCustomer,
 		arg.ID,
+		arg.FullName,
 		arg.Email,
 		arg.Phone,
-		arg.FullName,
-		arg.WalletSold,
+		arg.BalanceCents,
 	)
 	return err
 }
 
-const deleteCustomer = `-- name: DeleteCustomer :execrows
-DELETE FROM customers
-WHERE id = ?
-`
-
-func (q *Queries) DeleteCustomer(ctx context.Context, id string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteCustomer, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const getCustomerByEmail = `-- name: GetCustomerByEmail :one
-SELECT id, email, phone, full_name, wallet_sold
-FROM customers
+SELECT id, full_name, email, phone, balance_cents, created_at, updated_at FROM customers
 WHERE email = ? LIMIT 1
 `
 
@@ -57,17 +43,18 @@ func (q *Queries) GetCustomerByEmail(ctx context.Context, email string) (Custome
 	var i Customer
 	err := row.Scan(
 		&i.ID,
+		&i.FullName,
 		&i.Email,
 		&i.Phone,
-		&i.FullName,
-		&i.WalletSold,
+		&i.BalanceCents,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getCustomerByID = `-- name: GetCustomerByID :one
-SELECT id, email, phone, full_name, wallet_sold
-FROM customers
+SELECT id, full_name, email, phone, balance_cents, created_at, updated_at FROM customers
 WHERE id = ? LIMIT 1
 `
 
@@ -76,18 +63,19 @@ func (q *Queries) GetCustomerByID(ctx context.Context, id string) (Customer, err
 	var i Customer
 	err := row.Scan(
 		&i.ID,
+		&i.FullName,
 		&i.Email,
 		&i.Phone,
-		&i.FullName,
-		&i.WalletSold,
+		&i.BalanceCents,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listCustomers = `-- name: ListCustomers :many
-SELECT id, email, phone, full_name, wallet_sold
-FROM customers
-ORDER BY full_name ASC
+SELECT id, full_name, email, phone, balance_cents, created_at, updated_at FROM customers
+ORDER BY created_at DESC
 `
 
 func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
@@ -101,10 +89,12 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 		var i Customer
 		if err := rows.Scan(
 			&i.ID,
+			&i.FullName,
 			&i.Email,
 			&i.Phone,
-			&i.FullName,
-			&i.WalletSold,
+			&i.BalanceCents,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -119,30 +109,27 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 	return items, nil
 }
 
-const updateCustomer = `-- name: UpdateCustomer :execrows
+const updateCustomer = `-- name: UpdateCustomer :exec
 UPDATE customers
-SET email = ?, phone = ?, full_name = ?, wallet_sold = ?
+SET full_name = ?, email = ?, phone = ?, balance_cents = ?
 WHERE id = ?
 `
 
 type UpdateCustomerParams struct {
-	Email      string `json:"email"`
-	Phone      string `json:"phone"`
-	FullName   string `json:"full_name"`
-	WalletSold string `json:"wallet_sold"`
-	ID         string `json:"id"`
+	FullName     string `json:"full_name"`
+	Email        string `json:"email"`
+	Phone        string `json:"phone"`
+	BalanceCents int32  `json:"balance_cents"`
+	ID           string `json:"id"`
 }
 
-func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateCustomer,
+func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error {
+	_, err := q.db.ExecContext(ctx, updateCustomer,
+		arg.FullName,
 		arg.Email,
 		arg.Phone,
-		arg.FullName,
-		arg.WalletSold,
+		arg.BalanceCents,
 		arg.ID,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
+	return err
 }

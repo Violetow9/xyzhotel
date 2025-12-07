@@ -4,10 +4,35 @@
 
 package sqldb
 
+import (
+	"database/sql"
+	"time"
+)
+
 type Customer struct {
-	ID         string `json:"id"`
-	Email      string `json:"email"`
-	Phone      string `json:"phone"`
-	FullName   string `json:"full_name"`
-	WalletSold string `json:"wallet_sold"`
+	ID           string       `json:"id"`
+	FullName     string       `json:"full_name"`
+	Email        string       `json:"email"`
+	Phone        string       `json:"phone"`
+	BalanceCents int32        `json:"balance_cents"`
+	CreatedAt    sql.NullTime `json:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at"`
+}
+
+type Reservation struct {
+	ID               string       `json:"id"`
+	CustomerID       string       `json:"customer_id"`
+	RoomNumber       string       `json:"room_number"`
+	CheckInDate      time.Time    `json:"check_in_date"`
+	Nights           int32        `json:"nights"`
+	Status           string       `json:"status"`
+	TotalAmountCents int32        `json:"total_amount_cents"`
+	PaidAmountCents  int32        `json:"paid_amount_cents"`
+	CreatedAt        sql.NullTime `json:"created_at"`
+	UpdatedAt        sql.NullTime `json:"updated_at"`
+}
+
+type Room struct {
+	RoomNumber string `json:"room_number"`
+	Type       string `json:"type"`
 }
